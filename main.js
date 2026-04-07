@@ -30,7 +30,7 @@ const SCENE_SOURCES = [
 
 const FIXED_DISTANCE = 2.0;
 const CONTROLS_DISTANCE = 1.85;
-const DEFAULT_SCALE = 1.25;
+const DEFAULT_SCALE = 1.85;
 const MIN_SCALE = 0.85;
 const SCALE_STEP = 0.15;
 const PLAYER_PAN_STEP = 0.16;
@@ -40,9 +40,9 @@ const PLAYER_Y_LIMIT = 1.0;
 const BASE_VIDEO_WIDTH = 3.4;
 const BASE_VIDEO_HEIGHT = 1.92;
 const CONTROLS_WIDTH = 2.72;
-const CONTROLS_HEIGHT = 2.14;
+const CONTROLS_HEIGHT = 3.18;
 const VIDEO_Y_OFFSET = 0.18;
-const CONTROLS_Y_OFFSET = -0.26;
+const CONTROLS_Y_OFFSET = 0.02;
 const XR_STATUS_CLEAR_DELAY_MS = 3200;
 
 class FloatingVideoViewer extends xb.Script {
@@ -115,28 +115,29 @@ class FloatingVideoViewer extends xb.Script {
     this.add(this.controlsPanel);
 
     const grid = this.controlsPanel.addGrid();
+    const row = (weight) => ({weight: weight * 0.72});
 
-    grid.addRow({weight: 0.05});
+    grid.addRow(row(0.05));
 
-    this.titleView = grid.addRow({weight: 0.12}).addText({
+    this.titleView = grid.addRow(row(0.12)).addText({
       text: 'PowerGS Controls',
       fontSize: 0.074,
       fontColor: '#f7fbff',
     });
 
-    this.metaView = grid.addRow({weight: 0.1}).addText({
+    this.metaView = grid.addRow(row(0.1)).addText({
       text: 'Scene 1/4 | Move 0.00, 0.00 | Scale 1.25x',
       fontSize: 0.038,
       fontColor: '#99a7bf',
     });
 
-    this.panLabelView = grid.addRow({weight: 0.08}).addText({
+    this.panLabelView = grid.addRow(row(0.08)).addText({
       text: 'Move Canvas',
       fontSize: 0.052,
       fontColor: '#dce8ff',
     });
 
-    const panRow = grid.addRow({weight: 0.18});
+    const panRow = grid.addRow(row(0.18));
     panRow.addCol({weight: 0.04});
     this.leftButton = panRow.addCol({weight: 0.21}).addTextButton({
       text: 'Left',
@@ -179,13 +180,13 @@ class FloatingVideoViewer extends xb.Script {
     });
     panRow.addCol({weight: 0.04});
 
-    this.scaleLabelView = grid.addRow({weight: 0.08}).addText({
+    this.scaleLabelView = grid.addRow(row(0.08)).addText({
       text: 'Resize Canvas',
       fontSize: 0.052,
       fontColor: '#dce8ff',
     });
 
-    const sizeRow = grid.addRow({weight: 0.16});
+    const sizeRow = grid.addRow(row(0.16));
     sizeRow.addCol({weight: 0.06});
     this.smallerButton = sizeRow.addCol({weight: 0.41}).addTextButton({
       text: 'Smaller',
@@ -208,13 +209,13 @@ class FloatingVideoViewer extends xb.Script {
     });
     sizeRow.addCol({weight: 0.06});
 
-    this.sceneLabelView = grid.addRow({weight: 0.08}).addText({
+    this.sceneLabelView = grid.addRow(row(0.08)).addText({
       text: 'Switch Or Replay',
       fontSize: 0.052,
       fontColor: '#dce8ff',
     });
 
-    const sceneRow = grid.addRow({weight: 0.16});
+    const sceneRow = grid.addRow(row(0.16));
     sceneRow.addCol({weight: 0.04});
     this.prevButton = sceneRow.addCol({weight: 0.28}).addTextButton({
       text: 'Prev',
@@ -247,13 +248,13 @@ class FloatingVideoViewer extends xb.Script {
     });
     sceneRow.addCol({weight: 0.04});
 
-    this.xrLabelView = grid.addRow({weight: 0.07}).addText({
+    this.xrLabelView = grid.addRow(row(0.07)).addText({
       text: 'XR Session',
       fontSize: 0.052,
       fontColor: '#dce8ff',
     });
 
-    const xrRow = grid.addRow({weight: 0.14});
+    const xrRow = grid.addRow(row(0.14));
     xrRow.addCol({weight: 0.04});
     this.enterXrButton = xrRow.addCol({weight: 0.42}).addTextButton({
       text: 'Enter XR',
@@ -276,13 +277,13 @@ class FloatingVideoViewer extends xb.Script {
     });
     xrRow.addCol({weight: 0.04});
 
-    this.xrStatusView = grid.addRow({weight: 0.08}).addText({
+    this.xrStatusView = grid.addRow(row(0.08)).addText({
       text: '',
       fontSize: 0.045,
       fontColor: '#ffb9b9',
     });
 
-    grid.addRow({weight: 0.02});
+    grid.addRow(row(0.02));
 
     this.leftButton.onTriggered = () => this.adjustPan(-PLAYER_PAN_STEP, 0);
     this.upButton.onTriggered = () => this.adjustPan(0, PLAYER_PAN_STEP);
