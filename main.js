@@ -40,7 +40,7 @@ const PLAYER_Y_LIMIT = 1.0;
 const BASE_VIDEO_WIDTH = 3.4;
 const BASE_VIDEO_HEIGHT = 1.92;
 const CONTROLS_WIDTH = 2.72;
-const CONTROLS_HEIGHT = 1.72;
+const CONTROLS_HEIGHT = 2.02;
 const VIDEO_Y_OFFSET = 0.18;
 const CONTROLS_Y_OFFSET = -0.26;
 const XR_STATUS_CLEAR_DELAY_MS = 3200;
@@ -247,7 +247,26 @@ class FloatingVideoViewer extends xb.Script {
     });
     sceneRow.addCol({weight: 0.04});
 
-    grid.addRow({weight: 0.07});
+    this.xrLabelView = grid.addRow({weight: 0.07}).addText({
+      text: 'XR Session',
+      fontSize: 0.052,
+      fontColor: '#dce8ff',
+    });
+
+    const xrRow = grid.addRow({weight: 0.14});
+    xrRow.addCol({weight: 0.24});
+    this.exitXrButton = xrRow.addCol({weight: 0.52}).addTextButton({
+      text: 'Exit XR',
+      fontSizeDp: 68,
+      backgroundColor: '#662837',
+      opacity: 0.95,
+      fontColor: '#f7fbff',
+      height: 1.05,
+      width: 1.06,
+    });
+    xrRow.addCol({weight: 0.24});
+
+    grid.addRow({weight: 0.04});
 
     this.leftButton.onTriggered = () => this.adjustPan(-PLAYER_PAN_STEP, 0);
     this.upButton.onTriggered = () => this.adjustPan(0, PLAYER_PAN_STEP);
@@ -258,6 +277,7 @@ class FloatingVideoViewer extends xb.Script {
     this.prevButton.onTriggered = () => this.shiftScene(-1);
     this.replayButton.onTriggered = () => this.replayScene();
     this.nextButton.onTriggered = () => this.shiftScene(1);
+    this.exitXrButton.onTriggered = () => exitActiveXrSession();
 
     this.controlsPanel.updateLayouts();
     this.controlsPanel.visible = false;
@@ -410,59 +430,88 @@ class FloatingVideoViewer extends xb.Script {
   }
 }
 
-function attachPersistentXrLauncher() {
-  const launchButton = document.getElementById('xr-launch-button');
-  const statusView = document.getElementById('xr-launch-status');
-  const sessionManager = xb.core?.webXRSessionManager;
+let xrStatusTimeoutId = null;
 
-  if (!launchButton || !statusView || !sessionManager) {
+function setPersistentXrStatus(text = '', isError = false, sticky = false) {
+  const statusView = document.getElementById('xr-launch-status');
+  if (!statusView) {
     return;
   }
 
-  let statusTimeoutId = null;
+  if (xrStatusTimeoutId) {
+    window.clearTimeout(xrStatusTimeoutId);
+    xrStatusTimeoutId = null;
+  }
 
-  const setStatus = (text = '', isError = false, sticky = false) => {
-    if (statusTimeoutId) {
-      window.clearTimeout(statusTimeoutId);
-      statusTimeoutId = null;
-    }
+  statusView.textContent = text;
+  statusView.dataset.visible = text ? 'true' : 'false';
+  statusView.dataset.error = isError ? 'true' : 'false';
 
-    statusView.textContent = text;
-    statusView.dataset.visible = text ? 'true' : 'false';
-    statusView.dataset.error = isError ? 'true' : 'false';
+  if (text && !sticky) {
+    xrStatusTimeoutId = window.setTimeout(() => {
+      statusView.textContent = '';
+      statusView.dataset.visible = 'false';
+      statusView.dataset.error = 'false';
+    }, XR_STATUS_CLEAR_DELAY_MS);
+  }
+}
 
-    if (text && !sticky) {
-      statusTimeoutId = window.setTimeout(() => {
-        statusView.textContent = '';
-        statusView.dataset.visible = 'false';
-        statusView.dataset.error = 'false';
-      }, XR_STATUS_CLEAR_DELAY_MS);
-    }
-  };
+function syncPersistentXrButtonLabel() {
+  const launchButton = document.getElementById('xr-launch-button');
+  const sessionManager = xb.core?.webXRSessionManager;
+  if (!launchButton || !sessionManager) {
+    return;
+  }
 
-  const syncButtonLabel = () => {
-    launchButton.textContent = sessionManager.currentSession ? 'EXIT XR' : 'ENTER XR';
-  };
+  launchButton.textContent = sessionManager.currentSession ? 'EXIT XR' : 'ENTER XR';
+}
+
+function exitActiveXrSession() {
+  const sessionManager = xb.core?.webXRSessionManager;
+  if (!sessionManager?.currentSession) {
+    setPersistentXrStatus('No active XR session.', true);
+    return;
+  }
+
+  try {
+    sessionManager.endSession();
+  } catch (error) {
+    console.error(error);
+    setPersistentXrStatus(
+      error.message || 'Failed to exit immersive XR.',
+      true,
+      true
+    );
+  }
+}
+
+function attachPersistentXrLauncher() {
+  const launchButton = document.getElementById('xr-launch-button');
+  const sessionManager = xb.core?.webXRSessionManager;
+
+  if (!launchButton || !sessionManager) {
+    return;
+  }
 
   sessionManager.addEventListener('ready', () => {
-    syncButtonLabel();
-    setStatus('');
+    syncPersistentXrButtonLabel();
+    setPersistentXrStatus('');
   });
   sessionManager.addEventListener('unsupported', () => {
-    syncButtonLabel();
+    syncPersistentXrButtonLabel();
   });
   sessionManager.addEventListener('sessionstart', () => {
-    syncButtonLabel();
-    setStatus('');
+    syncPersistentXrButtonLabel();
+    setPersistentXrStatus('');
   });
   sessionManager.addEventListener('sessionend', () => {
-    syncButtonLabel();
+    syncPersistentXrButtonLabel();
   });
 
   launchButton.addEventListener('click', () => {
     try {
       if (sessionManager.currentSession) {
-        sessionManager.endSession();
+        exitActiveXrSession();
         return;
       }
 
@@ -473,11 +522,15 @@ function attachPersistentXrLauncher() {
       sessionManager.startSession();
     } catch (error) {
       console.error(error);
-      setStatus(error.message || 'Failed to start immersive XR.', true, true);
+      setPersistentXrStatus(
+        error.message || 'Failed to start immersive XR.',
+        true,
+        true
+      );
     }
   });
 
-  syncButtonLabel();
+  syncPersistentXrButtonLabel();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
