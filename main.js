@@ -43,6 +43,7 @@ const CONTROLS_WIDTH = 2.72;
 const CONTROLS_HEIGHT = 1.72;
 const VIDEO_Y_OFFSET = 0.18;
 const CONTROLS_Y_OFFSET = -0.26;
+const XR_STATUS_CLEAR_DELAY_MS = 3200;
 
 class FloatingVideoViewer extends xb.Script {
   constructor() {
@@ -409,10 +410,81 @@ class FloatingVideoViewer extends xb.Script {
   }
 }
 
+function attachPersistentXrLauncher() {
+  const launchButton = document.getElementById('xr-launch-button');
+  const statusView = document.getElementById('xr-launch-status');
+  const sessionManager = xb.core?.webXRSessionManager;
+
+  if (!launchButton || !statusView || !sessionManager) {
+    return;
+  }
+
+  let statusTimeoutId = null;
+
+  const setStatus = (text = '', isError = false, sticky = false) => {
+    if (statusTimeoutId) {
+      window.clearTimeout(statusTimeoutId);
+      statusTimeoutId = null;
+    }
+
+    statusView.textContent = text;
+    statusView.dataset.visible = text ? 'true' : 'false';
+    statusView.dataset.error = isError ? 'true' : 'false';
+
+    if (text && !sticky) {
+      statusTimeoutId = window.setTimeout(() => {
+        statusView.textContent = '';
+        statusView.dataset.visible = 'false';
+        statusView.dataset.error = 'false';
+      }, XR_STATUS_CLEAR_DELAY_MS);
+    }
+  };
+
+  const syncButtonLabel = () => {
+    launchButton.textContent = sessionManager.currentSession ? 'EXIT XR' : 'ENTER XR';
+  };
+
+  sessionManager.addEventListener('ready', () => {
+    syncButtonLabel();
+    setStatus('');
+  });
+  sessionManager.addEventListener('unsupported', () => {
+    syncButtonLabel();
+  });
+  sessionManager.addEventListener('sessionstart', () => {
+    syncButtonLabel();
+    setStatus('');
+  });
+  sessionManager.addEventListener('sessionend', () => {
+    syncButtonLabel();
+  });
+
+  launchButton.addEventListener('click', () => {
+    try {
+      if (sessionManager.currentSession) {
+        sessionManager.endSession();
+        return;
+      }
+
+      if (!sessionManager.isXRSupported()) {
+        throw new Error('Immersive XR is not supported in this browser.');
+      }
+
+      sessionManager.startSession();
+    } catch (error) {
+      console.error(error);
+      setStatus(error.message || 'Failed to start immersive XR.', true, true);
+    }
+  });
+
+  syncButtonLabel();
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const options = new xb.Options();
   options.enableUI();
   options.setAppTitle('XR Blocks PowerGS Viewer');
+  options.xrButton.enabled = false;
   const isQuestBrowser = /OculusBrowser|Quest/i.test(navigator.userAgent);
   if (isQuestBrowser) {
     options.enableVR();
@@ -443,4 +515,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   xb.add(viewer);
   await xb.init(options);
+  attachPersistentXrLauncher();
 });
