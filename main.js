@@ -413,8 +413,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const options = new xb.Options();
   options.enableUI();
   options.setAppTitle('XR Blocks PowerGS Viewer');
-  options.simulator.scenePath = OFFICE_SCENE_PATH;
-  options.simulator.scenePlanesPath = null;
+  const isQuestBrowser = /OculusBrowser|Quest/i.test(navigator.userAgent);
+  if (isQuestBrowser) {
+    options.enableVR();
+  } else {
+    options.simulator.scenePath = OFFICE_SCENE_PATH;
+    options.simulator.scenePlanesPath = null;
+  }
   options.simulator.instructions.enabled = false;
   options.simulator.handPosePanel.enabled = false;
   options.simulator.modeIndicator.enabled = false;
