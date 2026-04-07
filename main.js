@@ -40,7 +40,7 @@ const PLAYER_Y_LIMIT = 1.0;
 const BASE_VIDEO_WIDTH = 3.4;
 const BASE_VIDEO_HEIGHT = 1.92;
 const CONTROLS_WIDTH = 2.72;
-const CONTROLS_HEIGHT = 2.02;
+const CONTROLS_HEIGHT = 2.14;
 const VIDEO_Y_OFFSET = 0.18;
 const CONTROLS_Y_OFFSET = -0.26;
 const XR_STATUS_CLEAR_DELAY_MS = 3200;
@@ -254,8 +254,18 @@ class FloatingVideoViewer extends xb.Script {
     });
 
     const xrRow = grid.addRow({weight: 0.14});
-    xrRow.addCol({weight: 0.24});
-    this.exitXrButton = xrRow.addCol({weight: 0.52}).addTextButton({
+    xrRow.addCol({weight: 0.04});
+    this.enterXrButton = xrRow.addCol({weight: 0.42}).addTextButton({
+      text: 'Enter XR',
+      fontSizeDp: 64,
+      backgroundColor: '#24486c',
+      opacity: 0.95,
+      fontColor: '#f7fbff',
+      height: 1.05,
+      width: 1.06,
+    });
+    xrRow.addCol({weight: 0.04});
+    this.exitXrButton = xrRow.addCol({weight: 0.42}).addTextButton({
       text: 'Exit XR',
       fontSizeDp: 68,
       backgroundColor: '#662837',
@@ -264,9 +274,15 @@ class FloatingVideoViewer extends xb.Script {
       height: 1.05,
       width: 1.06,
     });
-    xrRow.addCol({weight: 0.24});
+    xrRow.addCol({weight: 0.04});
 
-    grid.addRow({weight: 0.04});
+    this.xrStatusView = grid.addRow({weight: 0.08}).addText({
+      text: '',
+      fontSize: 0.045,
+      fontColor: '#ffb9b9',
+    });
+
+    grid.addRow({weight: 0.02});
 
     this.leftButton.onTriggered = () => this.adjustPan(-PLAYER_PAN_STEP, 0);
     this.upButton.onTriggered = () => this.adjustPan(0, PLAYER_PAN_STEP);
@@ -277,6 +293,7 @@ class FloatingVideoViewer extends xb.Script {
     this.prevButton.onTriggered = () => this.shiftScene(-1);
     this.replayButton.onTriggered = () => this.replayScene();
     this.nextButton.onTriggered = () => this.shiftScene(1);
+    this.enterXrButton.onTriggered = () => enterImmersiveXrSession();
     this.exitXrButton.onTriggered = () => exitActiveXrSession();
 
     this.controlsPanel.updateLayouts();
@@ -433,7 +450,7 @@ class FloatingVideoViewer extends xb.Script {
 let xrStatusTimeoutId = null;
 
 function setPersistentXrStatus(text = '', isError = false, sticky = false) {
-  const statusView = document.getElementById('xr-launch-status');
+  const statusView = window.__xrImageViewer?.xrStatusView;
   if (!statusView) {
     return;
   }
@@ -443,27 +460,53 @@ function setPersistentXrStatus(text = '', isError = false, sticky = false) {
     xrStatusTimeoutId = null;
   }
 
-  statusView.textContent = text;
-  statusView.dataset.visible = text ? 'true' : 'false';
-  statusView.dataset.error = isError ? 'true' : 'false';
+  statusView.setText(text);
+  statusView.fontColor = isError ? '#ffb9b9' : '#a8e0bc';
 
   if (text && !sticky) {
     xrStatusTimeoutId = window.setTimeout(() => {
-      statusView.textContent = '';
-      statusView.dataset.visible = 'false';
-      statusView.dataset.error = 'false';
+      statusView.setText('');
     }, XR_STATUS_CLEAR_DELAY_MS);
   }
 }
 
-function syncPersistentXrButtonLabel() {
-  const launchButton = document.getElementById('xr-launch-button');
+function syncPersistentXrControls() {
+  const viewer = window.__xrImageViewer;
   const sessionManager = xb.core?.webXRSessionManager;
-  if (!launchButton || !sessionManager) {
+  if (!viewer || !sessionManager) {
     return;
   }
 
-  launchButton.textContent = sessionManager.currentSession ? 'EXIT XR' : 'ENTER XR';
+  viewer.enterXrButton.setText(
+    sessionManager.currentSession ? 'XR Active' : 'Enter XR'
+  );
+}
+
+function enterImmersiveXrSession() {
+  const sessionManager = xb.core?.webXRSessionManager;
+  if (!sessionManager) {
+    return;
+  }
+
+  try {
+    if (sessionManager.currentSession) {
+      setPersistentXrStatus('XR session already active.', true);
+      return;
+    }
+
+    if (!sessionManager.isXRSupported()) {
+      throw new Error('Immersive XR is not supported in this browser.');
+    }
+
+    sessionManager.startSession();
+  } catch (error) {
+    console.error(error);
+    setPersistentXrStatus(
+      error.message || 'Failed to start immersive XR.',
+      true,
+      true
+    );
+  }
 }
 
 function exitActiveXrSession() {
@@ -485,52 +528,30 @@ function exitActiveXrSession() {
   }
 }
 
-function attachPersistentXrLauncher() {
-  const launchButton = document.getElementById('xr-launch-button');
+function attachPersistentXrControls() {
   const sessionManager = xb.core?.webXRSessionManager;
 
-  if (!launchButton || !sessionManager) {
+  if (!sessionManager) {
     return;
   }
 
   sessionManager.addEventListener('ready', () => {
-    syncPersistentXrButtonLabel();
+    syncPersistentXrControls();
     setPersistentXrStatus('');
   });
   sessionManager.addEventListener('unsupported', () => {
-    syncPersistentXrButtonLabel();
+    syncPersistentXrControls();
   });
   sessionManager.addEventListener('sessionstart', () => {
-    syncPersistentXrButtonLabel();
+    syncPersistentXrControls();
     setPersistentXrStatus('');
   });
   sessionManager.addEventListener('sessionend', () => {
-    syncPersistentXrButtonLabel();
+    syncPersistentXrControls();
+    setPersistentXrStatus('');
   });
 
-  launchButton.addEventListener('click', () => {
-    try {
-      if (sessionManager.currentSession) {
-        exitActiveXrSession();
-        return;
-      }
-
-      if (!sessionManager.isXRSupported()) {
-        throw new Error('Immersive XR is not supported in this browser.');
-      }
-
-      sessionManager.startSession();
-    } catch (error) {
-      console.error(error);
-      setPersistentXrStatus(
-        error.message || 'Failed to start immersive XR.',
-        true,
-        true
-      );
-    }
-  });
-
-  syncPersistentXrButtonLabel();
+  syncPersistentXrControls();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -568,5 +589,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   xb.add(viewer);
   await xb.init(options);
-  attachPersistentXrLauncher();
+  attachPersistentXrControls();
 });
